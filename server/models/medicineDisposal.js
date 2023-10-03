@@ -5,27 +5,15 @@ const medicineSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  product: {
-    type: String,
-    required: true,
-  },
   batchId: {
     type: String,
-    required: true,
-  },
-  receiptId: {
-    type: String,
-    required: true,
-  },
-  expirationDate: {
-    type: Date,
     required: true,
   },
   quantity: {
     type: Number,
     required: true,
   },
-  notes: {
+  reason: {
     type: String,
     required: true,
   },

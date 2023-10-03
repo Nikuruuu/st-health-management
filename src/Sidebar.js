@@ -270,7 +270,7 @@ const Sidebar = () => {
           submenuName="medicineInventory"
           isActive={isActive}
           submenuLinks={[
-            { to: "/medicine-item", primary: "Medicine Item" },
+            { to: "/medicine-item", primary: "Stock Item" },
             { to: "/medicine-in", primary: "Stock In" },
             { to: "/medicine-disposal", primary: "Stock Disposal" },
             { to: "/medicine-adjustment", primary: "Stock Adjustment" },

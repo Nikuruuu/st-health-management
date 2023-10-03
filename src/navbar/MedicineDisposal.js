@@ -21,7 +21,7 @@ const MedicineDisposalNavBar = () => {
                 pl: 2,
               }}
             >
-              Medicine Stock Disposal
+              Medicine Inventory: Stock Disposal
             </Typography>
           </div>
 

@@ -27,9 +27,13 @@ const MedicineInForm = (props) => {
   });
 
   const validationSchema = yup.object().shape({
-    product: yup.string().required("Product (Name) is required"),
-    note: yup.string().required("Description is required"),
-    overallQuantity: yup.string().required("Overall Quantity is required"),
+    itemId: yup.string().required("Item ID is required"),
+    batchId: yup.string().required("Batch ID is required"),
+    receiptId: yup.string().required("Receipt ID is required"),
+    quantity: yup.number().required("Quantity is required"),
+    expirationDate: yup.date().required("Expiration Date is required"),
+    note: yup.string().nullable(),
+    
   });
 
   const showSnackbar = (message, severity) => {
@@ -55,17 +59,44 @@ const MedicineInForm = (props) => {
   } = useForm({
     resolver: yupResolver(validationSchema),
     defaultValues: {
+      expirationDate: "",
       quantity: 1,
-      note: "",
     },
   });
 
   const handleCreate = async (data) => {
+    if (!data.note) {
+      data.note = "";
+    }
+    
     try {
-      const response = await axiosInstance.post(
-        "medicineInventory/postIn",
-        data
-      );
+      let medicineItem;
+      try {
+        medicineItem = await axiosInstance.get(`medicineInventory/getItem/${data.itemId}`);
+      } catch (error) {
+        if (error.response || error.response.data || error.response.data.error === "Record not found") {
+          showSnackbar("Operation failed: Item ID mismatch", "error");
+          return;
+        }
+      }
+      
+      const medicineIn = await axiosInstance.get(`medicineInventory/getInBatchId/${data.batchId}`);
+
+      if (medicineIn.data.batchId === data.batchId) {
+        showSnackbar("Operation failed: Batch ID already exists", "error");
+        return;
+      } else {
+        
+      }
+
+      const response = await axiosInstance.post("medicineInventory/postIn", data);
+
+      const updatedOverallQuantity = medicineItem.data.overallQuantity + data.quantity;
+  
+      await axiosInstance.put(`medicineInventory/putItem/${data.itemId}`, {
+        overallQuantity: updatedOverallQuantity,
+      });
+  
       if (response.data._id) {
         if (typeof addNewDocument === "function") {
           addNewDocument(response.data);
@@ -75,6 +106,9 @@ const MedicineInForm = (props) => {
       } else {
         showSnackbar("Operation failed", "error");
       }
+  
+      
+  
     } catch (error) {
       console.error("An error occurred during adding:", error);
       if (error.response && error.response.data) {
@@ -83,7 +117,8 @@ const MedicineInForm = (props) => {
       showSnackbar("An error occurred during adding", "error");
     }
   };
-
+  
+  
   // Function to close the dialog and reset form values
   const handleClose = () => {
     reset();

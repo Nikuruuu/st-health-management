@@ -5,10 +5,6 @@ const medicineSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  product: {
-    type: String,
-    required: true,
-  },
   batchId: {
     type: String,
     required: true,
@@ -25,7 +21,7 @@ const medicineSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  notes: {
+  note: {
     type: String,
     default: "",
   },

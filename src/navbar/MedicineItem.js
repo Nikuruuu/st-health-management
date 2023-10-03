@@ -21,7 +21,7 @@ const MedicineItemNavBar = () => {
                 pl: 2,
               }}
             >
-              Medicine Item
+              Medicine Inventory: Stock Item
             </Typography>
           </div>
 

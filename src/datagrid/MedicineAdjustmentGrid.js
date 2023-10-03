@@ -1,37 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { DataGrid } from "@mui/x-data-grid";
-import IconButton from "@mui/material/IconButton";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
-import MedicineInventoryForm from "../modal/MedicineItemForm.js";
+import MedicineAdjustmentForm from "../modal/MedicineAdjustmentForm.js";
 import axiosInstance from "../config/axios-instance.js";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
 
-const MedicineInventoryGrid = () => {
+const MedicineAdjustmentGrid = () => {
   const [searchValue, setSearchValue] = useState("");
-  const [medicines, setMedicines] = useState([]);
+  const [document, setDocument] = useState([]);
   const [formOpen, setFormOpen] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [medicineIdToDelete, setMedicineIdToDelete] = useState(null);
-  const [selectedMedicine, setSelectedMedicine] = useState(null);
-
-  // Function to open dialog
-  const handleDialogOpen = (id) => {
-    setMedicineIdToDelete(id);
-    setDialogOpen(true);
-  };
-
-  // Function to close dialog
-  const handleDialogClose = () => {
-    setMedicineIdToDelete(null);
-    setDialogOpen(false);
-  };
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   // Function to handle search input changes
   const handleSearchChange = (event) => {
@@ -39,129 +17,110 @@ const MedicineInventoryGrid = () => {
   };
 
   // Function to format date string to YYYY-MM-DD
-  const formatYearFromDate = (dateString) => {
+  const yyyymmddDateFormat = (dateString) => {
     const date = new Date(dateString);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0"); // Add leading zero if needed
     const day = String(date.getDate()).padStart(2, "0"); // Add leading zero if needed
-    return `${year}-${month}-${day}`;
-  };
-
-  const fetchMedicines = async () => {
-    try {
-      const response = await axiosInstance.get(
-        "medicineInventory/fetchMedicine"
-      );
-      setMedicines(response.data);
-    } catch (error) {
-      console.error("An error occurred while fetching medicines:", error);
-    }
+    return `${month}/${day}/${year}`;
   };
 
   // Fetch medicines when the component mounts
   useEffect(() => {
-    fetchMedicines();
+    const fetchDocuments = async () => {
+      try {
+        const disposalData = await axiosInstance.get("medicineInventory/getAdjustment");
+        const modifiedRow = await Promise.all(disposalData.data.map(async (document) => {
+          try {
+            const itemData = await axiosInstance.get(`medicineInventory/getItem/${document.itemId}`);
+            const inData = await axiosInstance.get(`medicineInventory/getInBatchId/${document.batchId}`);
+            return { ...document, 
+              product: itemData.data.product,
+              expirationDate: inData.data.expirationDate, 
+              receiptId: inData.data.receiptId };
+          } catch (error) {
+            console.error("Error fetching Product, Expiration Date, and Receipt ID information:", error);
+            return { ...document }; // Default message if product fetch fails
+          }
+        }));
+        setDocument(modifiedRow);
+      } catch (error) {
+        console.error("An error occurred while fetching medicines:", error);
+      }
+    };
+    fetchDocuments();
   }, []);
 
   // Function to update state after a medicine item is updated
-  const onMedicineUpdated = (updatedMedicine) => {
-    const updatedMedicines = medicines.map((medicine) =>
-      medicine._id === updatedMedicine._id ? updatedMedicine : medicine
+  const onDocumentUpdated = (updatedDocument) => {
+    const updatedDocuments = document.map((document) =>
+      document._id === updatedDocument._id ? updatedDocument : document
     );
-    setMedicines(updatedMedicines);
+    setDocument(updatedDocuments);
   };
 
-  // Function to add a new medicine item
-  const addNewMedicine = (newMedicine) => {
-    setMedicines([...medicines, newMedicine]);
+   // Function to add a new medicine item
+   const addNewDocument = (newDocument) => {
+    modifiedRow(newDocument)
+      .then((updatedDocument) => {
+        setDocument([...document, updatedDocument]);
+      })
+      .catch((error) => console.error("Error updating Product, and Receipt ID information:", error));
+  };
+  
+  const modifiedRow = async (document) => {
+    try {
+      const inData = await axiosInstance.get(`medicineInventory/getIn/${document.batchId}`);
+      const itemData = await axiosInstance.get(`medicineInventory/getInBatchId/${document.itemId}`);
+      return { ...document, 
+        product: itemData.data.product,
+        receiptId: inData.data.receiptId };
+    } catch (error) {
+      console.error("Error updating Product, and Receipt ID information:", error);
+      return { ...document}; // Default message if product fetch fails
+    }
   };
 
   const columns = [
-    { field: "product", headerName: "Product", width: 150 },
-    { field: "category", headerName: "Category", width: 150 },
-    { field: "quantity", headerName: "Quantity", width: 100 },
-    {
-      field: "stockLevel",
-      headerName: "Stock Level",
+    { field: "_id", headerName: "ID", width: 250 },
+    { field: "itemId", headerName: "Item ID", width: 250 },
+    { field: "product", headerName: "Product", width: 200 },
+    { field: "batchId", headerName: "Batch ID", width: 250 },
+    { field: "quantity", headerName: "Quantity", width: 150 },
+    { field: "type",
+      headerName: "Type",
       width: 150,
       renderCell: (params) => {
         const assessment = params.value;
         let color = "";
 
         switch (assessment.toLowerCase()) {
-          case "high":
+          case "addition":
             color = "green";
             break;
-          case "moderate":
-            color = "orange";
-            break;
-          case "low":
+          case "subtraction":
             color = "red";
             break;
           default:
             color = "black";
         }
-
         return <span style={{ color }}>{assessment}</span>;
       },
     },
+    { field: "reason", headerName: "Reason/s", width: 300 },
     {
-      field: "expirationDate",
-      headerName: "Expiration \nDate",
+      field: "createdAt",
+      headerName: "Created",
       width: 150,
-      valueGetter: (params) => formatYearFromDate(params.row.expirationDate),
+      valueGetter: (params) => yyyymmddDateFormat(params.row.createdAt),
     },
     {
-      field: "restockDate",
-      headerName: "Restock Date",
+      field: "updatedAt",
+      headerName: "Updated",
       width: 150,
-      valueGetter: (params) => formatYearFromDate(params.row.restockDate),
-    },
-    { field: "note", headerName: "Note", width: 150 },
-    {
-      field: "action",
-      headerName: "Action",
-      width: 150,
-      renderCell: (params) => {
-        return (
-          <div>
-            <IconButton onClick={() => handleEditMedicine(params.row._id)}>
-              <EditIcon />
-            </IconButton>
-            <IconButton onClick={() => handleDialogOpen(params.row._id)}>
-              <DeleteOutlineIcon />
-            </IconButton>
-          </div>
-        );
-      },
+      valueGetter: (params) => yyyymmddDateFormat(params.row.updatedAt),
     },
   ];
-
-  const handleEditMedicine = (id) => {
-    const medicineToEdit = medicines.find((medicine) => medicine._id === id);
-    setSelectedMedicine(medicineToEdit);
-    setFormOpen(true); // Assuming this opens the form dialog
-  };
-
-  const handleDelete = () => {
-    if (medicineIdToDelete) {
-      axiosInstance
-        .delete(`medicineInventory/deleteMedicine/${medicineIdToDelete}`)
-        .then((response) => {
-          if (response.status === 200) {
-            setMedicines((prevMedicines) =>
-              prevMedicines.filter(
-                (medicine) => medicine._id !== medicineIdToDelete
-              )
-            );
-          } else {
-            console.error("Deleting medicine failed:", response.statusText);
-          }
-        })
-        .catch((error) => console.error("Deleting medicine failed:", error));
-    }
-    handleDialogClose();
-  };
 
   const handleModalClose = () => {
     setFormOpen(false);
@@ -171,23 +130,21 @@ const MedicineInventoryGrid = () => {
     setFormOpen(true);
   };
 
-  const filteredMedicine = medicines.filter((medicine) => {
+  const filteredDocuments = document.filter((document) => {
     const lowerSearchValue = searchValue.toLowerCase();
 
     // Explicitly convert numeric or date fields to string before using `toLowerCase()`.
     return (
-      (medicine.product?.toLowerCase() || "").includes(lowerSearchValue) ||
-      (medicine.category?.toLowerCase() || "").includes(lowerSearchValue) ||
-      (medicine.quantity?.toString() || "").includes(searchValue) || // convert to string
-      (medicine.stockLevel?.toLowerCase() || "").includes(lowerSearchValue) ||
-      (
-        new Date(medicine.expirationDate).toLocaleDateString()?.toLowerCase() ||
-        ""
-      ).includes(lowerSearchValue) || // Convert date to a string
-      (
-        new Date(medicine.restockDate).toLocaleDateString()?.toLowerCase() || ""
-      ).includes(lowerSearchValue) || // Convert date to a string
-      (medicine.note?.toLowerCase() || "").includes(lowerSearchValue)
+      (document._id?.toLowerCase() || "").includes(lowerSearchValue) ||
+      (document.itemId?.toLowerCase() || "").includes(lowerSearchValue) ||
+      (document.product?.toLowerCase() || "").includes(lowerSearchValue) ||
+      (document.quantity?.toString() || "").includes(searchValue) || // convert to string
+      (document.type?.toLowerCase() || "").includes(lowerSearchValue) ||
+      (document.reason?.toLowerCase() || "").includes(lowerSearchValue) ||
+      (new Date(document.createdAt).toLocaleDateString()?.toLowerCase() || "")
+        .includes(lowerSearchValue) || // Convert date to a string
+      (new Date(document.updatedAt).toLocaleDateString()?.toLowerCase() || "")
+      .includes(lowerSearchValue) // Convert date to a string
     );
   });
 
@@ -196,7 +153,7 @@ const MedicineInventoryGrid = () => {
       <div className="w-full max-w-screen-xl mx-auto px-4">
         <div className="mb-4 flex justify-end items-center">
           <Button variant="contained" color="primary" onClick={handleModalOpen}>
-            New Medicine
+            Adjust Medicine Stock
           </Button>
           <div className="ml-2">
             <TextField
@@ -209,7 +166,7 @@ const MedicineInventoryGrid = () => {
         </div>
         <DataGrid
           getRowId={(row) => row._id}
-          rows={filteredMedicine}
+          rows={filteredDocuments}
           columns={columns}
           initialState={{
             pagination: {
@@ -222,39 +179,23 @@ const MedicineInventoryGrid = () => {
           checkboxSelection
           disableRowSelectionOnClick
         />
-        <MedicineInventoryForm
+        <MedicineAdjustmentForm
           open={formOpen}
-          addNewMedicine={addNewMedicine}
-          onMedicineUpdated={onMedicineUpdated}
-          selectedMedicine={selectedMedicine}
+          addNewDocument={addNewDocument}
+          onDocumentUpdated={onDocumentUpdated}
+          selectedDocument={selectedDocument}
           onClose={() => {
-            setSelectedMedicine(null);
+            setSelectedDocument(null);
             handleModalClose();
           }}
           onCancel={() => {
-            setSelectedMedicine(null);
+            setSelectedDocument(null);
             handleModalClose();
           }}
         />
       </div>
-      <Dialog open={dialogOpen} onClose={handleDialogClose}>
-        <DialogTitle>Confirm Delete!</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this medicine item?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose} color="primary">
-            Cancel
-          </Button>
-          <Button onClick={handleDelete} color="primary">
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 };
 
-export default MedicineInventoryGrid;
+export default MedicineAdjustmentGrid;

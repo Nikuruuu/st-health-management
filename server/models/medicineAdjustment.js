@@ -5,16 +5,8 @@ const medicineSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  product: {
-    type: String,
-    required: true,
-  },
   batchId: {
     type: String,
-    required: true,
-  },
-  expirationDate: {
-    type: Date,
     required: true,
   },
   quantity: {
@@ -23,11 +15,12 @@ const medicineSchema = new mongoose.Schema({
   },
   type: {
     type: String,
+    enum: ["Addition", "Subtraction"],
     required: true,
   },
   reason: {
     type: String,
-    default: "",
+    required: true,
   },
 }, { timestamps: true });
 

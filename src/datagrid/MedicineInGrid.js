@@ -22,23 +22,31 @@ const MedicineInGrid = () => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0"); // Add leading zero if needed
     const day = String(date.getDate()).padStart(2, "0"); // Add leading zero if needed
-    return `${year}-${month}-${day}`;
+    return `${month}/${day}/${year}`;
   };
 
   // Fetch medicines when the component mounts
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const response = await axiosInstance.get(
-          "medicineInventory/getIn"
-        );
-        setDocument(response.data);
+        const inData = await axiosInstance.get("medicineInventory/getIn");
+        const modifiedRow = await Promise.all(inData.data.map(async (document) => {
+          try {
+            const itemData = await axiosInstance.get(`medicineInventory/getItem/${document.itemId}`);
+            return { ...document, product: itemData.data.product };
+          } catch (error) {
+            console.error("Error fetching Product information:", error);
+            return { ...document, product: "Product Not Found" }; // Default message if product fetch fails
+          }
+        }));
+        setDocument(modifiedRow);
       } catch (error) {
         console.error("An error occurred while fetching medicines:", error);
       }
     };
     fetchDocuments();
   }, []);
+  
 
   // Function to update state after a medicine item is updated
   const onDocumentUpdated = (updatedDocument) => {
@@ -50,8 +58,23 @@ const MedicineInGrid = () => {
 
   // Function to add a new medicine item
   const addNewDocument = (newDocument) => {
-    setDocument([...document, newDocument]);
+    modifiedRow(newDocument)
+      .then((updatedDocument) => {
+        setDocument([...document, updatedDocument]);
+      })
+      .catch((error) => console.error("Error updating Product information:", error));
   };
+  
+  const modifiedRow = async (document) => {
+    try {
+      const itemData = await axiosInstance.get(`medicineInventory/getItem/${document.itemId}`);
+      return { ...document, product: itemData.data.product };
+    } catch (error) {
+      console.error("Error updating Product information:", error);
+      return { ...document}; // Default message if product fetch fails
+    }
+  };
+  
 
   const columns = [
     { field: "_id", headerName: "ID", width: 250 },
@@ -64,18 +87,20 @@ const MedicineInGrid = () => {
       cellClassName: (params) => {
         const expirationDate = new Date(params.value);
         const currentDate = new Date();
-        let style = {};
-        // Check if expiration date is past or within a month from the current date
-        if (expirationDate < currentDate) {
-          style.color = "red";
+      
+        // Calculate the difference in months
+        const monthsDifference = (expirationDate.getFullYear() - currentDate.getFullYear()) * 12 +
+          (expirationDate.getMonth() - currentDate.getMonth());
+      
+        if (expirationDate <= currentDate) {
+          return 'text-red-500';  // Expired
+        } else if (monthsDifference <= 1) {
+          return 'text-yellow-500';  // Expiring within 1 month
+        } else if (monthsDifference >= 2) {
+          return 'text-green-500';  // Expiring within 2 months
         } else {
-          const oneMonthFromNow = new Date();
-          oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
-          if (expirationDate < oneMonthFromNow) {
-            style.color = "yellow";
-          }
+          return '';  // Default style
         }
-        return style;
       },
     },
     { field: "quantity", headerName: "Quantity", width: 100 },
@@ -130,7 +155,7 @@ const MedicineInGrid = () => {
       <div className="w-full max-w-screen-xl mx-auto px-4">
         <div className="mb-4 flex justify-end items-center">
           <Button variant="contained" color="primary" onClick={handleModalOpen}>
-            Add Medicine Stock
+            Stock In Medicine
           </Button>
           <div className="ml-2">
             <TextField

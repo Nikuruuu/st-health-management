@@ -21,7 +21,7 @@ const MedicineAdjustmentNavBar = () => {
                 pl: 2,
               }}
             >
-              Medicine Stock Adjustment
+              Medicine Inventory: Stock Adjustment
             </Typography>
           </div>
 
